@@ -150,12 +150,13 @@ button.green{background:var(--ok)}
     <div id="reqFormBox">
       <label>異動類型</label>
       <select id="reqType" onchange="onTypeChange()">
-        <option value="取消報名">取消報名（請填原因）</option>
-        <option value="改來回自行">改來回自行</option>
-        <option value="改搭大車來回">改搭大車來回</option>
-        <option value="改搭大車單去">改搭大車單去</option>
-        <option value="改搭大車單回">改搭大車單回</option>
-        <option value="申請同車">申請同車（請填原因）</option>
+        <option value="取消報名">取消報名（請寫取消原因）</option>
+        <option value="去回自行">去回自行</option>
+        <option value="去回大車">去回大車</option>
+        <option value="去大車-回自行">去大車-回自行</option>
+        <option value="去自行-回大車">去自行-回大車</option>
+        <option value="申請同車">申請同車（請填姓名與原因）</option>
+        <option value="其他">其他（請說明）</option>
       </select>
       <label id="detailLabel">原因／說明（選填）</label>
       <textarea id="reqDetail" placeholder="例：與家人同行、身體不適…"></textarea>
@@ -266,7 +267,7 @@ function leaderTab(t){
 }
 
 /* ==================== 領隊：申請 ==================== */
-const NEED_REASON = ['取消報名', '申請同車'];
+const NEED_REASON = ['取消報名', '申請同車', '其他'];
 
 function openReq(name){
   S.reqTarget = name;
@@ -285,9 +286,11 @@ function onTypeChange(){
   const t = $('reqType').value;
   $('detailLabel').textContent = NEED_REASON.includes(t)
     ? '原因／說明（必填）' : '原因／說明（選填）';
-  $('reqDetail').placeholder = (t === '申請同車')
-    ? '請填想同車的對象姓名，例：與王小芳同車'
-    : '例：與家人同行、身體不適…';
+  $('reqDetail').placeholder =
+    t === '申請同車' ? '請填想同車的對象姓名與原因，例：與王小芳同車，需互相照應'
+    : t === '取消報名' ? '請寫取消原因'
+    : t === '其他' ? '請說明需求'
+    : '補充說明（可不填）';
 }
 
 function preConfirm(){
@@ -374,40 +377,22 @@ function loadAdmin(){
   });
 }
 
-// 依申請類型給預設執行方式
-function suggestExec(r){
-  switch (r.type) {
-    case '取消報名':     return { exec:'delete' };
-    case '改來回自行':   return { exec:'toself' };
-    case '改搭大車來回': return { exec:'update', go:'', back:'' };   // 管理者指定去回車號
-    case '改搭大車單去': return { exec:'update', go:'', back:'' };   // 管理者指定去程
-    case '改搭大車單回': return { exec:'update', go:'', back:'' };   // 管理者指定回程
-    case '申請同車':     return { exec:'move' };                     // 管理者選目標車
-    default:             return { exec:'none' };
-  }
-}
+// 申請者與管理者使用同一組選項
+const TYPE_OPTIONS = ['取消報名','去回自行','去回大車','去大車-回自行','去自行-回大車','申請同車','其他'];
+const NEED_CAR = ['去回大車','去大車-回自行','去自行-回大車','申請同車'];   // 需要管理者指定車號
 
 function adminOps(r){
-  const s = suggestExec(r);
-  const carOpts = c => ['', ...S.cars, '自行']
-    .map(v => `<option value="${v}" ${v === (c || '') ? 'selected' : ''}>${v || '（不變）'}</option>`).join('');
-  const tgtOpts = S.cars.map(v =>
-    `<option value="${v}" ${v === (s.targetCar || '') ? 'selected' : ''}>${v}</option>`).join('');
-  return `<div class="admin-ops" id="ops-${r.id}">
-    <label>執行方式</label>
-    <select class="ex-mode" onchange="onExecMode('${r.id}')">
-      <option value="update" ${s.exec==='update'?'selected':''}>修改去／回程車號</option>
-      <option value="move"   ${s.exec==='move'  ?'selected':''}>整筆移到另一車</option>
-      <option value="toself" ${s.exec==='toself'?'selected':''}>轉「自行」表</option>
-      <option value="delete" ${s.exec==='delete'?'selected':''}>刪除（取消報名）</option>
-      <option value="none"   ${s.exec==='none'  ?'selected':''}>僅核准，不執行</option>
-    </select>
-    <div class="row ex-update ${s.exec==='update'?'':'hide'}">
-      <div><label>新去程</label><select class="ex-go">${carOpts(s.go)}</select></div>
-      <div><label>新回程</label><select class="ex-back">${carOpts(s.back)}</select></div>
-    </div>
-    <div class="ex-move ${s.exec==='move'?'':'hide'}">
-      <label>目標車</label><select class="ex-target">${tgtOpts}</select>
+  const defType = TYPE_OPTIONS.includes(r.type) ? r.type : '其他';
+  const typeOpts = TYPE_OPTIONS.map(t =>
+    `<option value="${t}" ${t === defType ? 'selected' : ''}>${t}</option>`).join('');
+  const carOpts = S.cars.map(c =>
+    `<option value="${c}" ${c === r.car ? 'selected' : ''}>${c}</option>`).join('');
+  return `<div class="admin-ops" id="ops-${r.id}" data-car="${r.car}">
+    <label>處理方式（核准後依此執行）</label>
+    <select class="ex-mode" onchange="onExecMode('${r.id}')">${typeOpts}</select>
+    <div class="ex-carbox ${NEED_CAR.includes(defType) ? '' : 'hide'}">
+      <label>大車車號（同車請選對方所在車）</label>
+      <select class="ex-car">${carOpts}</select>
     </div>
     <label>管理備註（選填）</label>
     <input class="ex-note" placeholder="回覆給領隊的說明">
@@ -422,19 +407,47 @@ function adminOps(r){
 function onExecMode(id){
   const box = $('ops-' + id);
   const m = box.querySelector('.ex-mode').value;
-  box.querySelector('.ex-update').classList.toggle('hide', m !== 'update');
-  box.querySelector('.ex-move').classList.toggle('hide', m !== 'move');
+  box.querySelector('.ex-carbox').classList.toggle('hide', !NEED_CAR.includes(m));
+}
+
+// 選項 → 後端執行參數
+// 同車：選的車＝原車就維持原車（不執行）；不同車就整筆移過去
+function buildExec(mode, curCar, selCar){
+  switch (mode) {
+    case '取消報名': return { exec:'delete' };
+    case '去回自行': return { exec:'toself' };
+    case '去回大車':
+      return selCar === curCar
+        ? { exec:'update', go:selCar, back:selCar }
+        : { exec:'move', targetCar:selCar };
+    case '去大車-回自行':
+      return selCar === curCar
+        ? { exec:'update', go:selCar, back:'自行' }
+        : { exec:'move', targetCar:selCar, go:selCar, back:'自行' };
+    case '去自行-回大車':
+      return selCar === curCar
+        ? { exec:'update', go:'自行', back:selCar }
+        : { exec:'move', targetCar:selCar, go:'自行', back:selCar };
+    case '申請同車':
+      return selCar === curCar
+        ? { exec:'none' }
+        : { exec:'move', targetCar:selCar };
+    default: return { exec:'none' };   // 其他：僅核准，視說明手動處理
+  }
 }
 
 function doProcess(id, decision){
   const box = $('ops-' + id);
-  const exec = decision === 'approve' ? box.querySelector('.ex-mode').value : 'none';
+  let ex = { exec:'none' };
+  if (decision === 'approve') {
+    ex = buildExec(box.querySelector('.ex-mode').value,
+                   box.dataset.car,
+                   box.querySelector('.ex-car').value);
+  }
   const params = {
     action:'process', code:S.adminCode, id, decision,
-    exec,
-    go:   box.querySelector('.ex-go').value,
-    back: box.querySelector('.ex-back').value,
-    targetCar: box.querySelector('.ex-target').value,
+    exec: ex.exec,
+    go: ex.go || '', back: ex.back || '', targetCar: ex.targetCar || '',
     note: box.querySelector('.ex-note').value.trim()
   };
   const msgEl = box.querySelector('.ex-msg');
