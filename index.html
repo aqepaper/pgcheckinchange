@@ -146,24 +146,34 @@ button.green{background:var(--ok)}
   <div class="sheet">
     <h2 id="reqTitle">異動申請</h2>
     <div class="req-body" id="reqInfo"></div>
-    <label>異動類型</label>
-    <select id="reqType" onchange="onTypeChange()">
-      <option value="改去程">改去程車</option>
-      <option value="改回程">改回程車</option>
-      <option value="改去回程">去回程都改</option>
-      <option value="取消出車（改自行）">取消出車（改自行前往）</option>
-      <option value="取消報名">取消報名（整筆刪除）</option>
-      <option value="其他">其他</option>
-    </select>
-    <div id="targetCarBox">
-      <label>目標車號</label>
-      <select id="reqTargetCar"></select>
+
+    <div id="reqFormBox">
+      <label>異動類型</label>
+      <select id="reqType" onchange="onTypeChange()">
+        <option value="取消報名">取消報名（請填原因）</option>
+        <option value="改來回自行">改來回自行</option>
+        <option value="改搭大車來回">改搭大車來回</option>
+        <option value="改搭大車單去">改搭大車單去</option>
+        <option value="改搭大車單回">改搭大車單回</option>
+        <option value="申請同車">申請同車（請填原因）</option>
+      </select>
+      <label id="detailLabel">原因／說明（選填）</label>
+      <textarea id="reqDetail" placeholder="例：與家人同行、身體不適…"></textarea>
+      <div class="row">
+        <button class="ghost" onclick="closeReq()">取消</button>
+        <button onclick="preConfirm()">送出申請</button>
+      </div>
     </div>
-    <label>原因／說明（選填）</label>
-    <textarea id="reqDetail" placeholder="例：與家人同行、身體不適…"></textarea>
-    <div class="row">
-      <button class="ghost" onclick="closeReq()">取消</button>
-      <button onclick="sendRequest()">送出申請</button>
+
+    <div id="confirmBox" class="hide">
+      <div class="req" style="margin-top:14px">
+        <div class="req-body" id="confirmText" style="font-size:17px;line-height:1.9"></div>
+      </div>
+      <div class="req-body" style="text-align:center">請確認以上內容無誤</div>
+      <div class="row">
+        <button class="ghost" onclick="backToEdit()">返回修改</button>
+        <button class="green" onclick="sendRequest()">確認送出</button>
+      </div>
     </div>
     <div class="msg" id="reqMsg"></div>
   </div>
@@ -256,17 +266,16 @@ function leaderTab(t){
 }
 
 /* ==================== 領隊：申請 ==================== */
+const NEED_REASON = ['取消報名', '申請同車'];
+
 function openReq(name){
   S.reqTarget = name;
   $('reqTitle').textContent = '異動申請：' + name;
   $('reqInfo').textContent = `${S.car}　由 ${S.name}（${S.role}）提出`;
-  $('reqTargetCar').innerHTML = S.cars
-    .filter(c => c !== S.car)
-    .map(c => `<option value="${c}">${c}</option>`).join('') +
-    '<option value="自行">自行</option>';
-  $('reqType').value = '改去回程';
+  $('reqType').selectedIndex = 0;
   $('reqDetail').value = '';
   setMsg('reqMsg', '');
+  backToEdit();
   onTypeChange();
   show('reqOverlay');
 }
@@ -274,17 +283,36 @@ function closeReq(){ hide('reqOverlay'); }
 
 function onTypeChange(){
   const t = $('reqType').value;
-  const need = (t === '改去程' || t === '改回程' || t === '改去回程');
-  $('targetCarBox').classList.toggle('hide', !need);
+  $('detailLabel').textContent = NEED_REASON.includes(t)
+    ? '原因／說明（必填）' : '原因／說明（選填）';
+  $('reqDetail').placeholder = (t === '申請同車')
+    ? '請填想同車的對象姓名，例：與王小芳同車'
+    : '例：與家人同行、身體不適…';
+}
+
+function preConfirm(){
+  const type = $('reqType').value;
+  const detail = $('reqDetail').value.trim();
+  if (NEED_REASON.includes(type) && !detail) {
+    return setMsg('reqMsg', '此類型請填寫原因／說明');
+  }
+  setMsg('reqMsg', '');
+  $('confirmText').innerHTML =
+    `對象：<b>${S.reqTarget}</b>（${S.car}）<br>` +
+    `異動類型：<b>${type}</b><br>` +
+    (detail ? `說明：${detail}` : '說明：（未填）');
+  hide('reqFormBox'); show('confirmBox');
+}
+
+function backToEdit(){
+  show('reqFormBox'); hide('confirmBox');
+  setMsg('reqMsg', '');
 }
 
 function sendRequest(){
-  const type = $('reqType').value;
-  const needTarget = !$('targetCarBox').classList.contains('hide');
-  const targetCar = needTarget ? $('reqTargetCar').value : '';
   setMsg('reqMsg', '送出中…', true);
   api({ action:'submit', car:S.car, applicant:S.name, target:S.reqTarget,
-        type, targetCar, detail:$('reqDetail').value.trim() })
+        type:$('reqType').value, targetCar:'', detail:$('reqDetail').value.trim() })
     .then(d => {
       if (!d.ok) return setMsg('reqMsg', d.msg);
       setMsg('reqMsg', '已送出', true);
@@ -349,15 +377,13 @@ function loadAdmin(){
 // 依申請類型給預設執行方式
 function suggestExec(r){
   switch (r.type) {
-    case '改去程':   return { exec:'update', go:r.targetCar, back:'' };
-    case '改回程':   return { exec:'update', go:'', back:r.targetCar };
-    case '改去回程':
-      return r.targetCar === '自行'
-        ? { exec:'toself' }
-        : { exec:'move', targetCar:r.targetCar };
-    case '取消出車（改自行）': return { exec:'toself' };
-    case '取消報名': return { exec:'delete' };
-    default:         return { exec:'none' };
+    case '取消報名':     return { exec:'delete' };
+    case '改來回自行':   return { exec:'toself' };
+    case '改搭大車來回': return { exec:'update', go:'', back:'' };   // 管理者指定去回車號
+    case '改搭大車單去': return { exec:'update', go:'', back:'' };   // 管理者指定去程
+    case '改搭大車單回': return { exec:'update', go:'', back:'' };   // 管理者指定回程
+    case '申請同車':     return { exec:'move' };                     // 管理者選目標車
+    default:             return { exec:'none' };
   }
 }
 
