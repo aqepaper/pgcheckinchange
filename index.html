@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>出車表異動申請</title>
+<style>
+:root{
+  --bg:#f5f1e8; --card:#fffdf8; --ink:#3a3128; --sub:#8a7d6b;
+  --line:#e5dccb; --accent:#7a5c2e; --accent-soft:#f0e6d2;
+  --pend:#b07b1f; --pend-bg:#fdf3df;
+  --ok:#3d7a4a;   --ok-bg:#e8f3ea;
+  --rej:#a8463c;  --rej-bg:#f9e9e7;
+  --a:#5b7a9d; --b:#7a9d5b; --c:#9d6b5b;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:"PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  background:var(--bg); color:var(--ink);
+  font-size:18px; line-height:1.6;
+  max-width:600px; margin:0 auto; padding:16px 14px 80px;
+}
+h1{font-size:22px; text-align:center; letter-spacing:2px; margin:8px 0 2px}
+.sub{text-align:center;color:var(--sub);font-size:14px;margin-bottom:18px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;
+      padding:16px;margin-bottom:14px;box-shadow:0 1px 3px rgba(90,70,40,.06)}
+label{display:block;font-size:15px;color:var(--sub);margin:10px 0 4px}
+input,select,textarea{
+  width:100%;font-size:19px;padding:12px;border:1.5px solid var(--line);
+  border-radius:10px;background:#fff;color:var(--ink);font-family:inherit}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);border-color:var(--accent)}
+textarea{min-height:84px;resize:vertical}
+button{
+  font-size:19px;font-family:inherit;border:none;border-radius:10px;
+  padding:13px 18px;cursor:pointer;width:100%;margin-top:14px;
+  background:var(--accent);color:#fff;letter-spacing:2px}
+button:active{opacity:.85}
+button.ghost{background:#fff;color:var(--accent);border:1.5px solid var(--accent)}
+button.small{width:auto;font-size:16px;padding:8px 16px;margin-top:0;letter-spacing:1px}
+button.danger{background:var(--rej)}
+button.green{background:var(--ok)}
+.row{display:flex;gap:10px}
+.row>*{flex:1}
+.hide{display:none!important}
+.msg{font-size:15px;text-align:center;margin-top:10px;min-height:22px}
+.msg.err{color:var(--rej)} .msg.ok{color:var(--ok)}
+
+/* 頁籤 */
+.tabs{display:flex;gap:8px;margin-bottom:14px}
+.tabs button{margin-top:0;background:#fff;color:var(--sub);
+  border:1.5px solid var(--line);font-size:17px;padding:10px}
+.tabs button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+/* 名單卡片 */
+.member{display:flex;align-items:center;gap:10px;
+  padding:12px 4px;border-bottom:1px dashed var(--line)}
+.member:last-child{border-bottom:none}
+.m-seq{width:30px;text-align:center;color:var(--sub);font-size:15px;flex:none}
+.m-main{flex:1;min-width:0}
+.m-name{font-size:19px;font-weight:600}
+.m-name small{font-weight:400;color:var(--sub);font-size:14px;margin-left:6px}
+.m-meta{font-size:14px;color:var(--sub)}
+.chip{display:inline-block;font-size:13px;padding:1px 8px;border-radius:99px;
+  background:var(--accent-soft);color:var(--accent);margin-right:4px}
+.chip.self{background:#eee;color:#777}
+.role-tag{display:inline-block;font-size:12px;background:var(--accent);color:#fff;
+  border-radius:6px;padding:1px 6px;margin-left:6px;vertical-align:2px}
+.has-req{font-size:12px;color:var(--pend)}
+
+/* 申請紀錄卡片 */
+.req{border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px;background:var(--card)}
+.req-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.req-title{font-size:18px;font-weight:600}
+.badge{font-size:13px;padding:3px 12px;border-radius:99px;white-space:nowrap}
+.badge.待處理{background:var(--pend-bg);color:var(--pend)}
+.badge.已核准{background:var(--ok-bg);color:var(--ok)}
+.badge.已退回{background:var(--rej-bg);color:var(--rej)}
+.req-body{font-size:15px;color:var(--sub)}
+.req-body b{color:var(--ink)}
+.admin-ops{border-top:1px dashed var(--line);margin-top:12px;padding-top:10px}
+.admin-ops .row{margin-top:8px}
+.topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.topbar .who{font-size:16px}
+.topbar a{font-size:14px;color:var(--sub)}
+.loading{text-align:center;color:var(--sub);padding:30px 0}
+
+/* 對話框 */
+.overlay{position:fixed;inset:0;background:rgba(50,40,25,.45);
+  display:flex;align-items:flex-end;justify-content:center;z-index:9}
+.sheet{background:var(--card);width:100%;max-width:600px;
+  border-radius:18px 18px 0 0;padding:20px 18px 30px;max-height:88vh;overflow-y:auto}
+.sheet h2{font-size:19px;margin-bottom:4px}
+</style>
+</head>
+<body>
+
+<h1>出車表異動申請</h1>
+<div class="sub" id="subTitle">領隊／副領隊登入後可查看名單並提出異動</div>
+
+<!-- ========== 登入 ========== -->
+<div id="loginView">
+  <div class="card">
+    <label>領隊／副領隊 手機號碼</label>
+    <input id="phoneInput" type="tel" inputmode="numeric" placeholder="例：0912345678">
+    <button onclick="leaderLogin()">登入查看本車名單</button>
+    <div class="msg" id="loginMsg"></div>
+  </div>
+  <div class="card">
+    <label>管理者代碼</label>
+    <input id="adminInput" type="password" inputmode="numeric" placeholder="輸入管理者代碼">
+    <button class="ghost" onclick="adminLogin()">管理者登入</button>
+    <div class="msg" id="adminMsg"></div>
+  </div>
+</div>
+
+<!-- ========== 領隊 ========== -->
+<div id="leaderView" class="hide">
+  <div class="topbar">
+    <div class="who" id="leaderWho"></div>
+    <a href="javascript:logout()">登出</a>
+  </div>
+  <div class="tabs">
+    <button id="tabRoster" class="on" onclick="leaderTab('roster')">本車名單</button>
+    <button id="tabMyReq" onclick="leaderTab('myreq')">申請紀錄</button>
+  </div>
+  <div id="rosterPane" class="card"></div>
+  <div id="myReqPane" class="hide"></div>
+</div>
+
+<!-- ========== 管理者 ========== -->
+<div id="adminView" class="hide">
+  <div class="topbar">
+    <div class="who">管理者</div>
+    <a href="javascript:logout()">登出</a>
+  </div>
+  <div class="tabs">
+    <button id="tabPending" class="on" onclick="adminTab('pending')">待處理</button>
+    <button id="tabAll" onclick="adminTab('all')">全部紀錄</button>
+  </div>
+  <button class="ghost small" style="margin-bottom:12px" onclick="loadAdmin()">重新整理</button>
+  <div id="adminPane"></div>
+</div>
+
+<!-- ========== 申請表單（彈窗） ========== -->
+<div id="reqOverlay" class="overlay hide" onclick="if(event.target===this)closeReq()">
+  <div class="sheet">
+    <h2 id="reqTitle">異動申請</h2>
+    <div class="req-body" id="reqInfo"></div>
+    <label>異動類型</label>
+    <select id="reqType" onchange="onTypeChange()">
+      <option value="改去程">改去程車</option>
+      <option value="改回程">改回程車</option>
+      <option value="改去回程">去回程都改</option>
+      <option value="取消出車（改自行）">取消出車（改自行前往）</option>
+      <option value="取消報名">取消報名（整筆刪除）</option>
+      <option value="其他">其他</option>
+    </select>
+    <div id="targetCarBox">
+      <label>目標車號</label>
+      <select id="reqTargetCar"></select>
+    </div>
+    <label>原因／說明（選填）</label>
+    <textarea id="reqDetail" placeholder="例：與家人同行、身體不適…"></textarea>
+    <div class="row">
+      <button class="ghost" onclick="closeReq()">取消</button>
+      <button onclick="sendRequest()">送出申請</button>
+    </div>
+    <div class="msg" id="reqMsg"></div>
+  </div>
+</div>
+
+<script>
+/* ======== 設定：貼上 GAS 網頁應用程式 URL ======== */
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbyLBN60t2TSXuImkLalFoxoxIc6LkUEOqcrH0sxKN6e4H81sPLD_KrPgvn2818NwHzBRA/exec';
+
+const S = { role:null, name:'', car:'', cars:[], roster:[], adminCode:'', reqTarget:null };
+
+function api(params){
+  const url = GAS_URL + '?' + new URLSearchParams(params).toString();
+  return fetch(url).then(r => r.json());
+}
+function $(id){ return document.getElementById(id); }
+function show(id){ $(id).classList.remove('hide'); }
+function hide(id){ $(id).classList.add('hide'); }
+function setMsg(id, text, ok){
+  const el = $(id); el.textContent = text || '';
+  el.className = 'msg ' + (ok ? 'ok' : 'err');
+}
+
+/* ==================== 登入登出 ==================== */
+function leaderLogin(){
+  const phone = $('phoneInput').value.trim();
+  if (!phone) return setMsg('loginMsg', '請輸入手機號碼');
+  setMsg('loginMsg', '查詢中…', true);
+  api({ action:'login', phone })
+    .then(d => {
+      if (!d.ok) return setMsg('loginMsg', d.msg);
+      Object.assign(S, { role:d.role, name:d.name, car:d.car, cars:d.cars, roster:d.roster });
+      $('leaderWho').innerHTML = `<b>${d.car}</b>　${d.name}<span class="role-tag">${d.role}</span>`;
+      $('subTitle').textContent = '本車異動申請，送出後由管理者統一處理';
+      hide('loginView'); show('leaderView');
+      renderRoster(); loadMyRequests();
+    })
+    .catch(() => setMsg('loginMsg', '連線失敗，請稍後再試'));
+}
+
+function adminLogin(){
+  const code = $('adminInput').value.trim();
+  if (!code) return setMsg('adminMsg', '請輸入管理者代碼');
+  setMsg('adminMsg', '驗證中…', true);
+  api({ action:'adminLogin', code })
+    .then(d => {
+      if (!d.ok) return setMsg('adminMsg', d.msg);
+      S.adminCode = code; S.cars = d.cars;
+      $('subTitle').textContent = '核准後可直接執行改車、移車、轉自行或刪除';
+      hide('loginView'); show('adminView');
+      loadAdmin();
+    })
+    .catch(() => setMsg('adminMsg', '連線失敗，請稍後再試'));
+}
+
+function logout(){ location.reload(); }
+
+/* ==================== 領隊：名單 ==================== */
+let myReqMap = {};   // 對象姓名 → 待處理筆數
+
+function renderRoster(){
+  const pane = $('rosterPane');
+  if (!S.roster.length) { pane.innerHTML = '<div class="loading">本車目前沒有名單</div>'; return; }
+  pane.innerHTML = S.roster.map(m => {
+    const goChip   = chip('去', m.go);
+    const backChip = chip('回', m.back);
+    const pending = myReqMap[m.name] ? `<span class="has-req">（已有 ${myReqMap[m.name]} 筆待處理）</span>` : '';
+    return `<div class="member">
+      <div class="m-seq">${m.seq}</div>
+      <div class="m-main">
+        <div class="m-name">${m.name}<small>${m.dharma || ''}</small>
+          ${m.role ? `<span class="role-tag">${m.role}</span>` : ''}</div>
+        <div class="m-meta">${m.group}　${goChip}${backChip} ${pending}</div>
+      </div>
+      <button class="small ghost" onclick='openReq(${JSON.stringify(m.name)})'>異動</button>
+    </div>`;
+  }).join('');
+}
+function chip(label, v){
+  const self = String(v) === '自行';
+  return `<span class="chip${self ? ' self' : ''}">${label} ${v || '—'}</span>`;
+}
+
+function leaderTab(t){
+  $('tabRoster').classList.toggle('on', t === 'roster');
+  $('tabMyReq').classList.toggle('on', t === 'myreq');
+  $('rosterPane').classList.toggle('hide', t !== 'roster');
+  $('myReqPane').classList.toggle('hide', t !== 'myreq');
+  if (t === 'myreq') loadMyRequests(true);
+}
+
+/* ==================== 領隊：申請 ==================== */
+function openReq(name){
+  S.reqTarget = name;
+  $('reqTitle').textContent = '異動申請：' + name;
+  $('reqInfo').textContent = `${S.car}　由 ${S.name}（${S.role}）提出`;
+  $('reqTargetCar').innerHTML = S.cars
+    .filter(c => c !== S.car)
+    .map(c => `<option value="${c}">${c}</option>`).join('') +
+    '<option value="自行">自行</option>';
+  $('reqType').value = '改去回程';
+  $('reqDetail').value = '';
+  setMsg('reqMsg', '');
+  onTypeChange();
+  show('reqOverlay');
+}
+function closeReq(){ hide('reqOverlay'); }
+
+function onTypeChange(){
+  const t = $('reqType').value;
+  const need = (t === '改去程' || t === '改回程' || t === '改去回程');
+  $('targetCarBox').classList.toggle('hide', !need);
+}
+
+function sendRequest(){
+  const type = $('reqType').value;
+  const needTarget = !$('targetCarBox').classList.contains('hide');
+  const targetCar = needTarget ? $('reqTargetCar').value : '';
+  setMsg('reqMsg', '送出中…', true);
+  api({ action:'submit', car:S.car, applicant:S.name, target:S.reqTarget,
+        type, targetCar, detail:$('reqDetail').value.trim() })
+    .then(d => {
+      if (!d.ok) return setMsg('reqMsg', d.msg);
+      setMsg('reqMsg', '已送出', true);
+      setTimeout(() => { closeReq(); loadMyRequests(); }, 600);
+    })
+    .catch(() => setMsg('reqMsg', '連線失敗，請稍後再試'));
+}
+
+function loadMyRequests(showPane){
+  api({ action:'myRequests', car:S.car }).then(d => {
+    if (!d.ok) return;
+    myReqMap = {};
+    d.list.filter(r => r.status === '待處理')
+          .forEach(r => { myReqMap[r.target] = (myReqMap[r.target] || 0) + 1; });
+    renderRoster();
+    $('myReqPane').innerHTML = d.list.length
+      ? d.list.map(r => reqCard(r, false)).join('')
+      : '<div class="loading">尚無申請紀錄</div>';
+  });
+}
+
+/* ==================== 共用：申請卡片 ==================== */
+function reqCard(r, admin){
+  const tgt = r.targetCar ? `<b>${r.targetCar}</b>` : '';
+  return `<div class="req">
+    <div class="req-head">
+      <div class="req-title">${r.target}　<span style="font-weight:400;font-size:15px;color:var(--sub)">${r.car}</span></div>
+      <span class="badge ${r.status}">${r.status}</span>
+    </div>
+    <div class="req-body">
+      <b>${r.type}</b> ${tgt}<br>
+      ${r.detail ? '說明：' + r.detail + '<br>' : ''}
+      申請人：${r.applicant}　${r.time}
+      ${r.adminNote ? '<br>管理回覆：' + r.adminNote : ''}
+      ${r.doneTime ? '　(' + r.doneTime + ')' : ''}
+    </div>
+    ${admin && r.status === '待處理' ? adminOps(r) : ''}
+  </div>`;
+}
+
+/* ==================== 管理者 ==================== */
+let adminMode = 'pending';
+function adminTab(t){
+  adminMode = t;
+  $('tabPending').classList.toggle('on', t === 'pending');
+  $('tabAll').classList.toggle('on', t === 'all');
+  loadAdmin();
+}
+
+function loadAdmin(){
+  $('adminPane').innerHTML = '<div class="loading">載入中…</div>';
+  api({ action:'allRequests', code:S.adminCode }).then(d => {
+    if (!d.ok) { $('adminPane').innerHTML = `<div class="loading">${d.msg}</div>`; return; }
+    let list = d.list;
+    if (adminMode === 'pending') list = list.filter(r => r.status === '待處理');
+    $('adminPane').innerHTML = list.length
+      ? list.map(r => reqCard(r, true)).join('')
+      : '<div class="loading">目前沒有資料</div>';
+  });
+}
+
+// 依申請類型給預設執行方式
+function suggestExec(r){
+  switch (r.type) {
+    case '改去程':   return { exec:'update', go:r.targetCar, back:'' };
+    case '改回程':   return { exec:'update', go:'', back:r.targetCar };
+    case '改去回程':
+      return r.targetCar === '自行'
+        ? { exec:'toself' }
+        : { exec:'move', targetCar:r.targetCar };
+    case '取消出車（改自行）': return { exec:'toself' };
+    case '取消報名': return { exec:'delete' };
+    default:         return { exec:'none' };
+  }
+}
+
+function adminOps(r){
+  const s = suggestExec(r);
+  const carOpts = c => ['', ...S.cars, '自行']
+    .map(v => `<option value="${v}" ${v === (c || '') ? 'selected' : ''}>${v || '（不變）'}</option>`).join('');
+  const tgtOpts = S.cars.map(v =>
+    `<option value="${v}" ${v === (s.targetCar || '') ? 'selected' : ''}>${v}</option>`).join('');
+  return `<div class="admin-ops" id="ops-${r.id}">
+    <label>執行方式</label>
+    <select class="ex-mode" onchange="onExecMode('${r.id}')">
+      <option value="update" ${s.exec==='update'?'selected':''}>修改去／回程車號</option>
+      <option value="move"   ${s.exec==='move'  ?'selected':''}>整筆移到另一車</option>
+      <option value="toself" ${s.exec==='toself'?'selected':''}>轉「自行」表</option>
+      <option value="delete" ${s.exec==='delete'?'selected':''}>刪除（取消報名）</option>
+      <option value="none"   ${s.exec==='none'  ?'selected':''}>僅核准，不執行</option>
+    </select>
+    <div class="row ex-update ${s.exec==='update'?'':'hide'}">
+      <div><label>新去程</label><select class="ex-go">${carOpts(s.go)}</select></div>
+      <div><label>新回程</label><select class="ex-back">${carOpts(s.back)}</select></div>
+    </div>
+    <div class="ex-move ${s.exec==='move'?'':'hide'}">
+      <label>目標車</label><select class="ex-target">${tgtOpts}</select>
+    </div>
+    <label>管理備註（選填）</label>
+    <input class="ex-note" placeholder="回覆給領隊的說明">
+    <div class="row">
+      <button class="green small" style="flex:1.4" onclick="doProcess('${r.id}','approve')">核准並執行</button>
+      <button class="danger small" onclick="doProcess('${r.id}','reject')">退回</button>
+    </div>
+    <div class="msg ex-msg"></div>
+  </div>`;
+}
+
+function onExecMode(id){
+  const box = $('ops-' + id);
+  const m = box.querySelector('.ex-mode').value;
+  box.querySelector('.ex-update').classList.toggle('hide', m !== 'update');
+  box.querySelector('.ex-move').classList.toggle('hide', m !== 'move');
+}
+
+function doProcess(id, decision){
+  const box = $('ops-' + id);
+  const exec = decision === 'approve' ? box.querySelector('.ex-mode').value : 'none';
+  const params = {
+    action:'process', code:S.adminCode, id, decision,
+    exec,
+    go:   box.querySelector('.ex-go').value,
+    back: box.querySelector('.ex-back').value,
+    targetCar: box.querySelector('.ex-target').value,
+    note: box.querySelector('.ex-note').value.trim()
+  };
+  const msgEl = box.querySelector('.ex-msg');
+  msgEl.textContent = '處理中…'; msgEl.className = 'msg ex-msg ok';
+  box.querySelectorAll('button').forEach(b => b.disabled = true);
+  api(params).then(d => {
+    msgEl.textContent = d.msg;
+    msgEl.className = 'msg ex-msg ' + (d.ok ? 'ok' : 'err');
+    if (d.ok) setTimeout(loadAdmin, 900);
+    else box.querySelectorAll('button').forEach(b => b.disabled = false);
+  }).catch(() => {
+    msgEl.textContent = '連線失敗'; msgEl.className = 'msg ex-msg err';
+    box.querySelectorAll('button').forEach(b => b.disabled = false);
+  });
+}
+</script>
+</body>
+</html>
